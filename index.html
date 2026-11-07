@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3ezz IPTV Player - LG Smart TV</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- HLS.js Lightweight for IPTV Streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- QRCode Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        tvRed: '#e50914',
+                        tvDark: '#121212',
+                        tvPanel: '#1e1e1e',
+                        tvHover: '#2a2a2a'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #0f0f0f;
+            color: #ffffff;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #tv-app-container {
+            width: 100vw;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1rem;
+        }
+
+        .focusable {
+            outline: none;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .focusable.focused {
+            transform: scale(1.02);
+            border-color: #e50914 !important;
+            background-color: #2a2a2a !important;
+            box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+            z-index: 10;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #121212; }
+        ::-webkit-scrollbar-thumb { background: #e50914; border-radius: 4px; }
+
+        #video-player-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000000;
+            z-index: 999999 !important;
+        }
+
+        #tv-video-element {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="tv-app-container" class="relative overflow-hidden text-slate-100">
+
+        <!-- TOP HEADER -->
+        <header class="bg-tvPanel rounded-xl p-3 flex items-center justify-between border border-slate-800 mb-3 shadow-md shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-tvRed flex items-center justify-center font-bold text-white text-xl">
+                    <i class="fa-solid fa-play"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-white tracking-wide">3ezz IPTV Player</h1>
+                    <p class="text-[11px] text-slate-400">مشغل قنوات لشاشات LG (بدون حاجة لتثبيت IPK)</p>
+                </div>
+            </div>
+
+            <div class="flex-1 max-w-sm mx-6 relative">
+                <input type="text" id="search-input" placeholder="بحث سريع في القنوات..." 
+                    class="focusable w-full bg-tvDark border border-slate-700 rounded-lg pr-9 pl-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none">
+                <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            </div>
+
+            <div class="flex items-center gap-4 text-xs">
+                <div class="flex items-center gap-1.5 text-emerald-400 bg-tvDark px-2.5 py-1 rounded-md border border-slate-800">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>متصفح الويب (Web Browser) جاهز</span>
+                </div>
+                <span id="clock" class="font-mono text-sm font-bold text-slate-200">00:00</span>
+            </div>
+        </header>
+
+        <!-- MAIN CONTAINER -->
+        <div class="flex-1 flex gap-3 overflow-hidden min-h-0">
+            
+            <!-- SIDEBAR -->
+            <aside class="bg-tvPanel w-56 rounded-xl p-2.5 flex flex-col justify-between border border-slate-800 shrink-0">
+                <div class="space-y-1 overflow-y-auto">
+                    <div class="text-[10px] text-slate-400 px-2 py-1 font-bold">القائمة الرئيسية</div>
+                    
+                    <button onclick="switchTab('tab-egypt')" class="focusable sidebar-tab w-full text-right p-2 rounded-lg border border-transparent flex items-center gap-2.5 text-slate-300 font-semibold text-xs">
+                        <i class="fa-solid fa-tv text-tvRed"></i>
+                        <span>القنوات المباشرة</span>
+                    </button>
+
+                    <button onclick="switchTab('tab-xtream')" class="focusable sidebar-tab w-full text-right p-2 rounded-lg border border-transparent flex items-center gap-2.5 text-slate-300 font-semibold text-xs">
+                        <i class="fa-solid fa-bolt text-amber-400"></i>
+                        <span>سيرفر Xtream IPTV</span>
+                    </button>
+
+                    <button onclick="switchTab('tab-stalker')" class="focusable sidebar-tab w-full text-right p-2 rounded-lg border border-transparent flex items-center gap-2.5 text-slate-300 font-semibold text-xs">
+                        <i class="fa-solid fa-microchip text-purple-400"></i>
+                        <span>Stalker Portal (MAC)</span>
+                    </button>
+
+                    <button onclick="switchTab('tab-m3u')" class="focusable sidebar-tab w-full text-right p-2 rounded-lg border border-transparent flex items-center gap-2.5 text-slate-300 font-semibold text-xs">
+                        <i class="fa-solid fa-file-code text-cyan-400"></i>
+                        <span>قراءة ملف / رابط M3U</span>
+                    </button>
+
+                    <button onclick="switchTab('tab-favorites')" class="focusable sidebar-tab w-full text-right p-2 rounded-lg border border-transparent flex items-center gap-2.5 text-slate-300 font-semibold text-xs">
+                        <i class="fa-solid fa-star text-yellow-400"></i>
+                        <span>المفضلة</span>
+                    </button>
+                </div>
+
+                <div class="bg-tvDark border border-slate-800 rounded-lg p-2 text-center shrink-0 mt-2">
+                    <div class="text-[9px] text-slate-400 mb-1">الربط بالموبايل QR</div>
+                    <div id="qrcode-canvas" class="flex justify-center bg-white p-1 rounded mx-auto w-fit mb-1"></div>
+                    <p class="text-[9px] text-emerald-400 font-bold">امسح لتشغيل الشاشة من الموبايل ⚡</p>
+                </div>
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <main class="flex-1 bg-tvPanel rounded-xl p-4 overflow-y-auto border border-slate-800 relative">
+
+                <!-- CHANNELS TAB -->
+                <section id="tab-egypt" class="tab-content space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish text-tvRed"></i> القنوات
+                        </h2>
+                    </div>
+                    <div class="grid grid-cols-4 gap-3" id="egypt-channels-grid"></div>
+                </section>
+
+                <!-- XTREAM TAB -->
+                <section id="tab-xtream" class="tab-content hidden space-y-3">
+                    <div class="border-b border-slate-800 pb-2">
+                        <h2 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                            <i class="fa-solid fa-bolt"></i> إعدادات سيرفر Xtream IPTV
+                        </h2>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 max-w-xl bg-tvDark p-3 rounded-lg border border-slate-800 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">رابط السيرفر Host:</label>
+                            <input type="text" id="xtream-host" placeholder="http://example.com:8080" class="focusable w-full bg-tvPanel border border-slate-700 rounded p-1.5 text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">اسم المستخدم User:</label>
+                            <input type="text" id="xtream-user" placeholder="username" class="focusable w-full bg-tvPanel border border-slate-700 rounded p-1.5 text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">كلمة المرور Password:</label>
+                            <input type="password" id="xtream-pass" placeholder="••••••••" class="focusable w-full bg-tvPanel border border-slate-700 rounded p-1.5 text-white focus:outline-none">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="btn-connect-xtream" onclick="alert('تم تفعيل البيانات وحفظها')" class="focusable w-full bg-amber-600 hover:bg-amber-700 text-white font-bold p-1.5 rounded text-xs">
+                                اتصال بالمزود
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STALKER PORTAL TAB -->
+                <section id="tab-stalker" class="tab-content hidden space-y-3">
+                    <div class="border-b border-slate-800 pb-2">
+                        <h2 class="text-sm font-bold text-purple-400 flex items-center gap-2">
+                            <i class="fa-solid fa-microchip"></i> Stalker Portal (MAC Authentication)
+                        </h2>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 max-w-xl bg-tvDark p-3 rounded-lg border border-slate-800 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">رابط البورتال Portal URL:</label>
+                            <input type="text" id="stalker-url" placeholder="http://stalker.server.com/c/" class="focusable w-full bg-tvPanel border border-slate-700 rounded p-1.5 text-white focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">العنوان الفيزيائي MAC Address:</label>
+                            <input type="text" id="stalker-mac" placeholder="00:1A:79:XX:XX:XX" class="focusable w-full bg-tvPanel border border-slate-700 rounded p-1.5 text-white focus:outline-none">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- M3U TAB -->
+                <section id="tab-m3u" class="tab-content hidden space-y-3">
+                    <div class="border-b border-slate-800 pb-2">
+                        <h2 class="text-sm font-bold text-cyan-400 flex items-center gap-2">
+                            <i class="fa-solid fa-file-lines"></i> فتح وقراءة ملف أو رابط M3U
+                        </h2>
+                    </div>
+                    <div class="bg-tvDark p-4 rounded-lg border border-slate-800 space-y-3 text-xs max-w-xl">
+                        <div class="flex gap-2">
+                            <input type="text" id="m3u-url-input" placeholder="أدخل رابط M3U المباشر هنا..." class="focusable flex-1 bg-tvPanel border border-slate-700 p-2 rounded text-white">
+                            <button onclick="alert('جاري تشغيل ملف المظهر')" class="focusable bg-cyan-600 hover:bg-cyan-700 text-white font-bold px-4 py-2 rounded">تحميل الرابط</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- FAVORITES TAB -->
+                <section id="tab-favorites" class="tab-content hidden space-y-3">
+                    <div class="border-b border-slate-800 pb-2">
+                        <h2 class="text-sm font-bold text-yellow-400 flex items-center gap-2">
+                            <i class="fa-solid fa-star"></i> المفضلة
+                        </h2>
+                    </div>
+                    <div id="fav-channels-grid" class="grid grid-cols-4 gap-3"></div>
+                </section>
+            </main>
+        </div>
+
+        <!-- FULLSCREEN VIDEO PLAYER -->
+        <div id="video-player-modal" class="hidden flex flex-col justify-between p-4">
+            <div class="flex items-center justify-between text-white bg-black/90 p-3 rounded-lg border border-slate-800 shrink-0 z-10">
+                <div class="flex items-center gap-3">
+                    <button id="v-player-back-btn" onclick="closeVideoPlayer()" class="focusable bg-tvRed px-3 py-1.5 rounded text-xs font-bold text-white">
+                        <i class="fa-solid fa-arrow-right"></i> إغلاق ورجوع
+                    </button>
+                    <h3 id="v-player-title" class="font-bold text-sm text-slate-200">اسم القناة</h3>
+                </div>
+            </div>
+
+            <div class="flex-1 relative w-full h-full flex items-center justify-center overflow-hidden my-2">
+                <video id="tv-video-element" class="w-full h-full object-contain bg-black" controls autoplay></video>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let favorites = [];
+        let focusableElements = [];
+        let currentIndex = 0;
+        let isVideoPlayerOpen = false;
+
+        const freeChannels = [
+            { title: "ON Time Sports 1", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+            { title: "ON Time Sports 2", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+            { title: "MBC مصر", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+            { title: "ON E الفضائية", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+            { title: "DMC العامة", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+            { title: "سبيستون SpaceToon", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" }
+        ];
+
+        function renderEgyptGrid() {
+            const grid = document.getElementById('egypt-channels-grid');
+            if (!grid) return;
+
+            grid.innerHTML = freeChannels.map(ch => `
+                <div class="card-item focusable bg-tvDark rounded-lg p-3 border border-slate-800 flex flex-col items-center justify-center cursor-pointer hover:border-tvRed min-h-[100px]"
+                     onclick="launchVideoPlayer('${ch.url}', '${ch.title}')">
+                    <i class="fa-solid fa-tv text-3xl text-tvRed mb-2"></i>
+                    <span class="font-bold text-xs text-center text-slate-200">${ch.title}</span>
+                </div>
+            `).join('');
+            updateFocusables();
+        }
+
+        function launchVideoPlayer(src, title) {
+            const modal = document.getElementById('video-player-modal');
+            const videoElem = document.getElementById('tv-video-element');
+            const titleElem = document.getElementById('v-player-title');
+            
+            if (!modal || !videoElem) return;
+            if (titleElem) titleElem.textContent = title;
+            
+            modal.classList.remove('hidden');
+            isVideoPlayerOpen = true;
+
+            if (Hls.isSupported() && src.includes('.m3u8')) {
+                const hls = new Hls();
+                hls.loadSource(src);
+                hls.attachMedia(videoElem);
+            } else {
+                videoElem.src = src;
+            }
+            videoElem.play().catch(() => {});
+        }
+
+        function closeVideoPlayer() {
+            const modal = document.getElementById('video-player-modal');
+            const videoElem = document.getElementById('tv-video-element');
+            if (videoElem) { videoElem.pause(); videoElem.src = ''; }
+            if (modal) modal.classList.add('hidden');
+            isVideoPlayerOpen = false;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            const activeTab = document.getElementById(tabId);
+            if (activeTab) activeTab.classList.remove('hidden');
+            updateFocusables();
+        }
+
+        function updateFocusables() {
+            focusableElements = Array.from(document.querySelectorAll('.focusable:not(.hidden)'));
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderEgyptGrid();
+            setInterval(() => {
+                const clock = document.getElementById('clock');
+                if (clock) {
+                    const now = new Date();
+                    clock.textContent = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
